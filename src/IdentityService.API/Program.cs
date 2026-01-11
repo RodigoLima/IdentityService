@@ -171,6 +171,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 // Domain Services
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IPasswordHasher, PasswordHasherService>();
 
 // Application Services
 builder.Services.AddScoped<IUserApplicationService, UserApplicationService>();
