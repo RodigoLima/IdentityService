@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identityservice-api
+  namespace: identityservice
+  labels:
+    app: identityservice-api
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: identityservice-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: identityservice-api
+        version: v1
+    spec:
+      containers:
+      - name: identityservice-api
+        image: ${DOCKER_SERVER}/${DOCKER_REPOSITORY}:${IMAGE_VERSION}
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        
+        env:
+        # ConfigMap - Configurações públicas
+        - name: ASPNETCORE_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: ASPNETCORE_ENVIRONMENT
+        
+        - name: ASPNETCORE_URLS
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: ASPNETCORE_URLS
+        
+        - name: AWS__Region
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: AWS__Region
+        
+        - name: AWS__AccountId
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: AWS__AccountId
+        
+        - name: DatabaseProvider
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: DatabaseProvider
+        
+        - name: Jwt__ExpirationTimeHour
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: Jwt__ExpirationTimeHour
+        
+        - name: Jwt__IncreaseExpirationTimeMinutes
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: Jwt__IncreaseExpirationTimeMinutes
+        
+        - name: PATH_BASE
+          valueFrom:
+            configMapKeyRef:
+              name: identityservice-config
+              key: PATH_BASE
+        
+        # Secrets - Dados sensíveis
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            secretKeyRef:
+              name: identityservice-secret
+              key: ConnectionStrings__DefaultConnection
+
+        - name: ConnectionStrings__PostgreSql
+          valueFrom:
+            secretKeyRef:
+              name: identityservice-secret
+              key: ConnectionStrings__PostgreSql
+        
+        - name: Jwt__Key
+          valueFrom:
+            secretKeyRef:
+              name: identityservice-secret
+              key: Jwt__Key
+        
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 30

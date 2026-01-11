@@ -1,0 +1,440 @@
+name: CI/CD - Build, Test and Deploy to AWS EKS
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  # .NET Configuration
+  DOTNET_VERSION: "8.0.x"
+  SOLUTION_FILE: "IdentityService.sln"
+  
+  # AWS Configuration
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: identityservice-api
+  EKS_CLUSTER_NAME: identityservice-cluster
+  K8S_NAMESPACE: identityservice
+
+jobs:
+  # ============================================
+  # JOB 1: BUILD AND TEST
+  # ============================================
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+      - name: Build solution
+        run: dotnet build ${{ env.SOLUTION_FILE }} -c Release --no-restore --verbosity normal
+
+      - name: Run tests
+        run: |
+          dotnet test ${{ env.SOLUTION_FILE }} \
+            -c Release \
+            --no-build \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
+        continue-on-error: true
+
+      - name: Publish API
+        run: |
+          dotnet publish ./src/IdentityService.API/IdentityService.API.csproj \
+            -c Release \
+            -o ./out/api \
+            --no-build
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: ./TestResults
+          retention-days: 30
+
+      - name: Upload API artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-artifacts
+          path: ./out/api
+          retention-days: 7
+
+  # ============================================
+  # JOB 2: BUILD AND PUSH DOCKER IMAGE
+  # ============================================
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+      image-tag: ${{ steps.build-image.outputs.image-tag }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "🔨 Building Docker image..."
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
+          echo "📤 Pushing to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "✅ Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+  # ============================================
+  # JOB 3: DEPLOY TO EKS
+  # ============================================
+  deploy:
+    name: Deploy to AWS EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl for EKS
+        run: |
+          echo "⚙️  Configuring kubectl for EKS..."
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          kubectl version --client
+          kubectl cluster-info
+
+      - name: Verify cluster access
+        run: |
+          echo "🔍 Verifying cluster access..."
+          kubectl get nodes
+          kubectl get namespaces
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace ${{ env.K8S_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      # ============================================
+      # GENERATE KUBERNETES SECRET FROM TEMPLATE
+      # ============================================
+      - name: Generate and apply Secret
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+        run: |
+          echo "🔐 Gerando Secret a partir do template..."
+          
+          # Exportar variáveis para envsubst
+          export K8S_NAMESPACE="${{ env.K8S_NAMESPACE }}"
+          export DB_HOST="${DB_HOST}"
+          export DB_NAME="${DB_NAME}"
+          export DB_USER="${DB_USER}"
+          export DB_PASSWORD="${DB_PASSWORD}"
+          export DB_PORT="${DB_PORT}"
+          export JWT_KEY="${JWT_KEY}"
+          
+          # Gerar secret usando envsubst
+          envsubst < k8s/secret.yaml.template > k8s/secret.yaml
+          
+          echo "✅ Secret gerado com sucesso"
+          
+          # Validar chaves (SEM MOSTRAR VALORES)
+          echo "📋 Chaves que serão criadas:"
+          echo "  - ConnectionStrings__PostgreSql"
+          echo "  - ConnectionStrings__DefaultConnection"
+          echo "  - Jwt__Key"
+          
+          # Aplicar secret
+          echo "📦 Aplicando Secret no cluster..."
+          kubectl apply -f k8s/secret.yaml
+          
+          # Validar secret criado
+          echo "✅ Secret aplicado. Verificando chaves..."
+          kubectl get secret identityservice-secret -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.data}' | grep -o '"[^"]*":' | tr -d '":' | grep -v "^$"
+
+      # ============================================
+      # APPLY KUBERNETES MANIFESTS
+      # ============================================
+      - name: Apply ConfigMap
+        run: |
+          echo "📦 Applying ConfigMap..."
+          kubectl apply -f k8s/configmap.yaml
+
+      - name: Apply Deployment
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          DOCKER_SERVER: ${{ steps.login-ecr.outputs.registry }}
+          DOCKER_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          IMAGE_VERSION: ${{ needs.build-and-push.outputs.image-tag }}
+        run: |
+          echo "📝 Applying Deployment..."
+          envsubst < k8s/deployment.yaml | kubectl apply -f -
+
+      - name: Apply Service
+        run: |
+          echo "🌐 Applying Service..."
+          kubectl apply -f k8s/service.yaml
+
+      # ============================================
+      # DEPLOY MONITORING (PROMETHEUS + GRAFANA)
+      # ============================================
+      - name: Apply Prometheus
+        run: |
+          echo "📊 Deploying Prometheus..."
+          kubectl apply -f k8s/prometheus-config.yaml
+          kubectl apply -f k8s/prometheus-deployment.yaml
+          
+          echo "✅ Prometheus deployed"
+
+      - name: Apply Grafana
+        run: |
+          echo "📈 Deploying Grafana..."
+          kubectl apply -f k8s/grafana-deployment.yaml
+          
+          echo "✅ Grafana deployed"
+
+      # ============================================
+      # WAIT FOR ROLLOUT
+      # ============================================
+      - name: Wait for deployment rollout
+        run: |
+          echo "⏳ Waiting for deployment rollout (timeout: 5min)..."
+          kubectl rollout status deployment/identityservice-api -n ${{ env.K8S_NAMESPACE }} --timeout=5m || echo "⚠️ Rollout timeout"
+
+      # ============================================
+      # DEBUG AND DIAGNOSTICS
+      # ============================================
+      - name: Debug deployment issues
+        if: always()
+        run: |
+          echo "================================================"
+          echo "🔍 DIAGNÓSTICO COMPLETO DO DEPLOYMENT"
+          echo "================================================"
+          echo ""
+          
+          echo "1️⃣ Status dos Pods:"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=identityservice-api -o wide
+          echo ""
+          
+          echo "2️⃣ Deployment Status:"
+          kubectl get deployment identityservice-api -n ${{ env.K8S_NAMESPACE }} -o wide
+          echo ""
+          
+          echo "3️⃣ ReplicaSet Status:"
+          kubectl get rs -n ${{ env.K8S_NAMESPACE }} -l app=identityservice-api -o wide
+          echo ""
+          
+          echo "4️⃣ Secret Keys (SEM VALORES):"
+          kubectl get secret identityservice-secret -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.data}' | grep -o '"[^"]*":' | tr -d '":' | grep -v "^$"
+          echo ""
+          
+          echo "5️⃣ Deployment ENV Config:"
+          kubectl get deployment identityservice-api -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.spec.template.spec.containers[0].env[*].name}' | tr ' ' '\n'
+          echo ""
+          
+          echo "6️⃣ Eventos Recentes:"
+          kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by='.lastTimestamp' | tail -40
+          echo ""
+          
+          echo "7️⃣ Logs dos Pods (últimas 100 linhas):"
+          for pod in $(kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=identityservice-api -o name); do
+            echo "--- Logs de $pod ---"
+            kubectl logs -n ${{ env.K8S_NAMESPACE }} $pod --tail=100 || echo "Não foi possível obter logs"
+            echo ""
+          done
+          
+          echo "8️⃣ Describe Pods:"
+          kubectl describe pods -n ${{ env.K8S_NAMESPACE }} -l app=identityservice-api | tail -100
+          echo ""
+          
+          echo "================================================"
+
+      # ============================================
+      # VERIFY DEPLOYMENT SUCCESS
+      # ============================================
+      - name: Verify deployment success
+        run: |
+          READY=$(kubectl get deployment identityservice-api -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.readyReplicas}')
+          DESIRED=$(kubectl get deployment identityservice-api -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.spec.replicas}')
+          
+          echo "Ready: ${READY:-0} / Desired: $DESIRED"
+          
+          if [ "${READY:-0}" != "$DESIRED" ]; then
+            echo "❌ FALHA: Apenas ${READY:-0} de $DESIRED replicas prontas"
+            
+            echo ""
+            echo "🔍 Última verificação de pods:"
+            kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=identityservice-api -o wide
+            
+            exit 1
+          fi
+          
+          echo "✅ Deployment bem-sucedido: Todas as $DESIRED replicas estão prontas!"
+
+      # ============================================
+      # GET SERVICE URL
+      # ============================================
+      - name: Get service URLs
+        id: service-url
+        run: |
+          echo "🌐 Getting service URLs..."
+          
+          # API URL
+          for i in {1..30}; do
+            API_URL=$(kubectl get svc identityservice-service -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+            
+            if [ -n "$API_URL" ]; then
+              echo "url=http://$API_URL" >> $GITHUB_OUTPUT
+              echo "✅ API URL: http://$API_URL"
+              echo "📖 Swagger: http://$API_URL/swagger"
+              echo "🏥 Health: http://$API_URL/health"
+              break
+            fi
+            
+            echo "⏳ Waiting for API LoadBalancer... ($i/30)"
+            sleep 10
+          done
+          
+          # Prometheus URL
+          PROMETHEUS_URL=$(kubectl get svc prometheus -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          if [ -n "$PROMETHEUS_URL" ]; then
+            echo "prometheus-url=http://$PROMETHEUS_URL:9090" >> $GITHUB_OUTPUT
+            echo "📊 Prometheus: http://$PROMETHEUS_URL:9090"
+          fi
+          
+          # Grafana URL
+          GRAFANA_URL=$(kubectl get svc grafana -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          if [ -n "$GRAFANA_URL" ]; then
+            echo "grafana-url=http://$GRAFANA_URL:3000" >> $GITHUB_OUTPUT
+            echo "📈 Grafana: http://$GRAFANA_URL:3000 (admin/admin)"
+          fi
+          
+          if [ -z "$API_URL" ]; then
+            echo "⚠️  LoadBalancers not ready yet. Check later with:"
+            echo "kubectl get svc -n ${{ env.K8S_NAMESPACE }}"
+          fi
+
+      # ============================================
+      # DEPLOYMENT SUMMARY
+      # ============================================
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "# 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ needs.build-and-push.outputs.image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cluster:** \`${{ env.EKS_CLUSTER_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Namespace:** \`${{ env.K8S_NAMESPACE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "${{ steps.service-url.outputs.url }}" ]; then
+            echo "## 🌐 URLs" >> $GITHUB_STEP_SUMMARY
+            echo "- **API:** ${{ steps.service-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Swagger:** ${{ steps.service-url.outputs.url }}/swagger" >> $GITHUB_STEP_SUMMARY
+            echo "- **Health:** ${{ steps.service-url.outputs.url }}/health" >> $GITHUB_STEP_SUMMARY
+            
+            if [ -n "${{ steps.service-url.outputs.prometheus-url }}" ]; then
+              echo "- **Prometheus:** ${{ steps.service-url.outputs.prometheus-url }}" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ -n "${{ steps.service-url.outputs.grafana-url }}" ]; then
+              echo "- **Grafana:** ${{ steps.service-url.outputs.grafana-url }} (admin/admin)" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "## ⏳ LoadBalancer Pending" >> $GITHUB_STEP_SUMMARY
+            echo "Get URL with: \`kubectl get svc identityservice-service -n identityservice\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Kubernetes Resources" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get all -n ${{ env.K8S_NAMESPACE }} >> $GITHUB_STEP_SUMMARY || echo "Unable to fetch resources" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      # ============================================
+      # ROLLBACK ON FAILURE
+      # ============================================
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Rolling back..."
+          kubectl rollout undo deployment/identityservice-api -n ${{ env.K8S_NAMESPACE }} || echo "⚠️  Unable to rollback"
+          
+          echo "📋 Current pod status:"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=identityservice-api
+          
+          echo ""
+          echo "📋 Recent events:"
+          kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by='.lastTimestamp' | tail -20

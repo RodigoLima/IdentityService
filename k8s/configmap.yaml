@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: identityservice-config
+  namespace: identityservice
+  labels:
+    app: identityservice
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  AWS__Region: "us-east-1"
+  AWS__AccountId: "211125430602"
+  DatabaseProvider: "PostgreSql"
+  Jwt__ExpirationTimeHour: "5"
+  Jwt__IncreaseExpirationTimeMinutes: "20"
+  PATH_BASE: "/api/identity"
