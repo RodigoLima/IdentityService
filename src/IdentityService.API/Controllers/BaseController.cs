@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace IdentityService.API.Controllers;
+namespace IdentityService.Api.Controllers;
 
 [ApiController]
-public class BaseController(ILogger<BaseController> logger) : ControllerBase
+[Authorize]
+public abstract class BaseController : ControllerBase
 {
-    private readonly ILogger<BaseController> _logger = logger;
 }

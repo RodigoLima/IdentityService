@@ -1,45 +1,51 @@
-using Microsoft.AspNetCore.Authorization;
+using IdentityService.Api.DTOs;
+using IdentityService.Application.Services;
 using Microsoft.AspNetCore.Mvc;
-using IdentityService.API.Constants;
-using IdentityService.API.Filters;
-using IdentityService.Application.Dto;
-using IdentityService.Application.Interfaces;
 
-namespace IdentityService.API.Controllers;
+namespace IdentityService.Api.Controllers;
 
-[Route("users")]
-[ApiController]
-public class UserController(ILogger<UserController> logger, IUserApplicationService userApplicationService) : BaseController(logger)
+[Route("api/[controller]")]
+public class UserController : BaseController
 {
-    private readonly IUserApplicationService _userApplicationService = userApplicationService;
+    private readonly UserService _userService;
 
-    /// <summary>
-    /// Criar um novo usuário
-    /// </summary>
-    /// <param name="user">Objeto com as propriedades para criar um novo usuário</param>
-    /// <returns>Um objeto do usuário criado</returns>
-    [HttpPost]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
-    [Authorize(Policy = AppConstants.Policies.Admin)]
-    public async Task<object> Create([FromBody] GuestUser user)
+    public UserController(UserService userService)
     {
-        var entity = await _userApplicationService.Add(user);
-        return Ok(entity);
+        _userService = userService;
     }
 
-    /// <summary>
-    /// Criar um novo usuário
-    /// </summary>
-    /// <param name="user">Objeto com as propriedades para criar um novo usuário</param>
-    /// <returns>Um objeto do usuário criado</returns>
-    [HttpPost("admin")]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
-    [SkipUserFilter]
-    public async Task<object> CreateAdmin([FromBody] GuestUser user)
+    [HttpPost]
+    public async Task<IActionResult> Criar([FromBody] CriarUsuarioDto dto)
     {
-        var entity = await _userApplicationService.AddAdmin(user);
-        return Ok(entity);
+        try
+        {
+            var user = await _userService.CriarAsync(dto.Nome, dto.Email, dto.Senha, isAdmin: false);
+            return CreatedAtAction(nameof(ObterPorId), new { id = user.Id }, user);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("admin")]
+    public async Task<IActionResult> CriarAdmin([FromBody] CriarUsuarioDto dto)
+    {
+        try
+        {
+            var user = await _userService.CriarAsync(dto.Nome, dto.Email, dto.Senha, isAdmin: true);
+            return CreatedAtAction(nameof(ObterPorId), new { id = user.Id }, user);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> ObterPorId(Guid id)
+    {
+        var user = await _userService.ObterPorIdAsync(id);
+        return user == null ? NotFound() : Ok(user);
     }
 }

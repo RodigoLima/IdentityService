@@ -1,32 +1,29 @@
+using IdentityService.Api.DTOs;
+using IdentityService.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using IdentityService.API.Filters;
-using IdentityService.Application.Dto;
-using IdentityService.Application.Interfaces;
 
-namespace IdentityService.API.Controllers;
+namespace IdentityService.Api.Controllers;
 
-[Route("accounts")]
-public class AccountController(ILogger<AccountController> logger, ITokenApplicationService _tokenApplicationService) : BaseController(logger)
+[Route("api/[controller]")]
+public class AccountController : ControllerBase
 {
-    ///<summary>
-    ///Gera o token a partir de um usuário e senha
-    ///</summary>
-    /// <remarks>
-    /// Obs: Obrigatório informar o email e senha do usuário
-    /// </remarks>
-    /// <param name="userLogin">Objeto com email e senha do usuário</param>
-    /// <returns>Um token de autenticação</returns>
-    [HttpPost("token")]
-    [Produces("application/json")]
-    [SkipUserFilter]
-    [ProducesResponseType(typeof(User), StatusCodes.Status200OK)]
-    public async Task<object> GetToken([FromBody] UserLogin userLogin)
+    private readonly TokenService _tokenService;
+
+    public AccountController(TokenService tokenService)
     {
-        var token = await _tokenApplicationService.GetToken(userLogin);
+        _tokenService = tokenService;
+    }
+
+    [HttpPost("token")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ObterToken([FromBody] LoginDto dto)
+    {
+        var token = await _tokenService.GerarTokenAsync(dto.Email, dto.Senha);
 
         if (string.IsNullOrEmpty(token))
             return Unauthorized();
 
-        return Ok(token);
+        return Ok(new { token });
     }
 }

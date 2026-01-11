@@ -1,0 +1,81 @@
+using IdentityService.Application.Interfaces;
+using IdentityService.Domain.Entities;
+using IdentityService.Domain.Interfaces.Security;
+using IdentityService.Domain.Configuration;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+
+namespace IdentityService.Application.Services;
+
+public class TokenService
+{
+    private readonly IUserRepository _userRepository;
+    private readonly IPasswordHasher _passwordHasher;
+    private readonly TokenConfiguration _configuration;
+
+    public TokenService(
+        IUserRepository userRepository, 
+        IPasswordHasher passwordHasher,
+        IOptions<TokenConfiguration> configuration)
+    {
+        _userRepository = userRepository;
+        _passwordHasher = passwordHasher;
+        _configuration = configuration.Value;
+    }
+
+    public async Task<string?> GerarTokenAsync(string email, string senha)
+    {
+        var user = await _userRepository.ObterPorEmailAsync(email);
+        if (user == null)
+            return null;
+
+        if (string.IsNullOrWhiteSpace(user.Password))
+            return null;
+
+        // Verifica se a senha fornecida corresponde ao hash armazenado
+        bool isPasswordValid = _passwordHasher.VerifyPassword(senha, user.Password);
+
+        // Se o hash não funcionou, tenta comparar em texto plano (para senhas antigas)
+        if (!isPasswordValid && user.Password == senha)
+        {
+            // Senha antiga em texto plano detectada - atualizar para hash
+            user.Password = _passwordHasher.HashPassword(senha);
+            await _userRepository.AtualizarAsync(user);
+            isPasswordValid = true;
+        }
+
+        if (!isPasswordValid)
+            return null;
+
+        return CriarToken(user);
+    }
+
+    private string CriarToken(User user)
+    {
+        var jwtKey = _configuration.Key;
+        if (string.IsNullOrEmpty(jwtKey))
+            throw new InvalidOperationException("JWT Key não configurada.");
+
+        var key = Convert.FromBase64String(jwtKey);
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim("sub", user.Id.ToString()),
+                new Claim("userId", user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
+                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+                new Claim(ClaimTypes.Role, user.AccessLevel.HasValue ? ((int)user.AccessLevel.Value).ToString() : string.Empty)
+            ]),
+            Expires = DateTime.UtcNow.AddHours(_configuration.ExpirationTimeHour),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+        };
+
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+}
