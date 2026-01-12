@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityService.Api.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/users")]
 public class UserController : BaseController
 {
     private readonly UserService _userService;
@@ -15,12 +15,12 @@ public class UserController : BaseController
     }
 
     [HttpPost]
-    public async Task<IActionResult> Criar([FromBody] CriarUsuarioDto dto)
+    public async Task<IActionResult> Create([FromBody] CriarUsuarioDto dto)
     {
         try
         {
             var user = await _userService.CriarAsync(dto.Nome, dto.Email, dto.Senha, isAdmin: false);
-            return CreatedAtAction(nameof(ObterPorId), new { id = user.Id }, user);
+            return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
         }
         catch (ArgumentException ex)
         {
@@ -29,12 +29,12 @@ public class UserController : BaseController
     }
 
     [HttpPost("admin")]
-    public async Task<IActionResult> CriarAdmin([FromBody] CriarUsuarioDto dto)
+    public async Task<IActionResult> CreateAdmin([FromBody] CriarUsuarioDto dto)
     {
         try
         {
             var user = await _userService.CriarAsync(dto.Nome, dto.Email, dto.Senha, isAdmin: true);
-            return CreatedAtAction(nameof(ObterPorId), new { id = user.Id }, user);
+            return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
         }
         catch (ArgumentException ex)
         {
@@ -43,7 +43,7 @@ public class UserController : BaseController
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> ObterPorId(Guid id)
+    public async Task<IActionResult> GetById(Guid id)
     {
         var user = await _userService.ObterPorIdAsync(id);
         return user == null ? NotFound() : Ok(user);

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityService.Api.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/auth")]
 public class AccountController : ControllerBase
 {
     private readonly TokenService _tokenService;
@@ -15,9 +15,9 @@ public class AccountController : ControllerBase
         _tokenService = tokenService;
     }
 
-    [HttpPost("token")]
+    [HttpPost("login")]
     [AllowAnonymous]
-    public async Task<IActionResult> ObterToken([FromBody] LoginDto dto)
+    public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
         var token = await _tokenService.GerarTokenAsync(dto.Email, dto.Senha);
 

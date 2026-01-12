@@ -54,25 +54,41 @@ public class TokenService
 
     private string CriarToken(User user)
     {
-        var jwtKey = _configuration.Key;
-        if (string.IsNullOrEmpty(jwtKey))
+        if (string.IsNullOrWhiteSpace(_configuration.Key))
             throw new InvalidOperationException("JWT Key não configurada.");
+        
+        if (string.IsNullOrWhiteSpace(_configuration.Issuer))
+            throw new InvalidOperationException("JWT Issuer não configurado.");
+        
+        if (string.IsNullOrWhiteSpace(_configuration.Audience))
+            throw new InvalidOperationException("JWT Audience não configurada.");
 
-        var key = Convert.FromBase64String(jwtKey);
+        var key = Convert.FromBase64String(_configuration.Key);
         var tokenHandler = new JwtSecurityTokenHandler();
+        
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new("sub", user.Id.ToString()),
+            new("userId", user.Id.ToString()),
+            new(ClaimTypes.Name, user.Name ?? string.Empty),
+            new(ClaimTypes.Email, user.Email ?? string.Empty)
+        };
+
+        if (user.AccessLevel.HasValue)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, ((int)user.AccessLevel.Value).ToString()));
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim("sub", user.Id.ToString()),
-                new Claim("userId", user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
-                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                new Claim(ClaimTypes.Role, user.AccessLevel.HasValue ? ((int)user.AccessLevel.Value).ToString() : string.Empty)
-            ]),
+            Subject = new ClaimsIdentity(claims),
+            Issuer = _configuration.Issuer,
+            Audience = _configuration.Audience,
             Expires = DateTime.UtcNow.AddHours(_configuration.ExpirationTimeHour),
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(key), 
+                SecurityAlgorithms.HmacSha256Signature)
         };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
