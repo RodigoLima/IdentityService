@@ -1,4 +1,5 @@
 using IdentityService.Api.Configuration;
+using IdentityService.Application.Interfaces;
 using IdentityService.Application.Services;
 using IdentityService.Domain.Configuration;
 using IdentityService.Domain.Interfaces.Security;
