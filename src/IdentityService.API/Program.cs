@@ -1,5 +1,4 @@
 using IdentityService.Api.Configuration;
-using IdentityService.Application.Interfaces;
 using IdentityService.Application.Services;
 using IdentityService.Domain.Configuration;
 using IdentityService.Domain.Interfaces.Security;
@@ -25,8 +24,6 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseNpgsql(connectionString);
-    options.ConfigureWarnings(warnings => 
-        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 });
 
 // Token Configuration
@@ -40,7 +37,7 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasherService>();
 
 // Application Services
 builder.Services.AddScoped<UserService>();
-builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<IdentityService.Application.Services.TokenService>();
 
 var app = builder.Build();
 

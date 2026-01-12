@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Security.Claims;
-using System.Text;
 using System.Text.Encodings.Web;
 
 namespace IdentityService.Api.Configuration;
@@ -39,18 +39,19 @@ public static class JwtConfiguration
             options => { })
         .AddJwtBearer(options =>
         {
-            if (string.IsNullOrEmpty(jwtSettings.SecretKey))
-                throw new InvalidOperationException("JWT SecretKey não configurada.");
+            if (string.IsNullOrWhiteSpace(jwtSettings.Key))
+                throw new InvalidOperationException("JWT Key não configurada.");
+
+            var signingKey = Convert.FromBase64String(jwtSettings.Key);
 
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidateAudience = true,
+                ValidateAudience = false,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtSettings.Issuer,
-                ValidAudience = jwtSettings.Audience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey))
+                IssuerSigningKey = new SymmetricSecurityKey(signingKey)
             };
         });
 

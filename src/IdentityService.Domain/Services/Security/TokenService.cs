@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -43,15 +42,24 @@ public class TokenService(IOptions<TokenConfiguration> options, IMemoryCache cac
 
         var key = Convert.FromBase64String(jwtKey);
         var tokenHandler = new JwtSecurityTokenHandler();
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new("sub", user.Id.ToString()),
+            new("userId", user.Id.ToString()),
+            new(ClaimTypes.Name, user.Name ?? string.Empty),
+            new(ClaimTypes.Email, user.Email ?? string.Empty)
+        };
+
+        if (user.AccessLevel.HasValue)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, ((int)user.AccessLevel.Value).ToString()));
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
-                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                new Claim(ClaimTypes.Role, user.AccessLevel.HasValue ? ((int)user.AccessLevel.Value).ToString() : string.Empty)
-            ]),
+            Subject = new ClaimsIdentity(claims),
+            Issuer = _configuration.Issuer,
             Expires = DateTime.UtcNow.AddHours(_configuration.ExpirationTimeHour),
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
         };

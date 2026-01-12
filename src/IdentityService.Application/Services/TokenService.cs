@@ -59,9 +59,6 @@ public class TokenService
         
         if (string.IsNullOrWhiteSpace(_configuration.Issuer))
             throw new InvalidOperationException("JWT Issuer não configurado.");
-        
-        if (string.IsNullOrWhiteSpace(_configuration.Audience))
-            throw new InvalidOperationException("JWT Audience não configurada.");
 
         var key = Convert.FromBase64String(_configuration.Key);
         var tokenHandler = new JwtSecurityTokenHandler();
@@ -84,7 +81,6 @@ public class TokenService
         {
             Subject = new ClaimsIdentity(claims),
             Issuer = _configuration.Issuer,
-            Audience = _configuration.Audience,
             Expires = DateTime.UtcNow.AddHours(_configuration.ExpirationTimeHour),
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(key), 
