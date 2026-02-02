@@ -11,8 +11,7 @@ public class TokenApplicationService(IUserService userService, ITokenService tok
 
     public async Task<string> GetToken(UserLogin userLogin)
     {
-        var user = await userService.GetByEmail(userLogin.Email)
-            ?? throw new UnauthorizedAccessException("Usuário não encontrado");
+        var user = await userService.GetByEmail(userLogin.Email);
 
         if (string.IsNullOrWhiteSpace(user.Password))
             throw new UnauthorizedAccessException("Senha inválida");
@@ -37,8 +36,7 @@ public class TokenApplicationService(IUserService userService, ITokenService tok
 
     public async Task<string> GetTokenByAutorization(string? email)
     {
-        var user = await userService.GetByEmail(email)
-            ?? throw new UnauthorizedAccessException("Usuário não encontrado");
+        var user = await userService.GetByEmail(email);
 
         return tokenService.GenerateToken(user, force: true);
     }

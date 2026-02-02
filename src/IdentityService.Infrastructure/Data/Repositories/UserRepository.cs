@@ -10,14 +10,14 @@ public class UserRepository(ApplicationDbContext context) : BaseRepository<User>
     {
         var query = BaseQuery(tracking);
 
-        return await query.FirstOrDefaultAsync(x => x.Id == id);
+        return await query.FirstOrDefaultAsync(x => x.Id == id) ?? throw new InvalidOperationException($"User with id {id} not found");
     }
 
-    public async Task<User> GetByEmail(string email, bool include = false, bool tracking = false)
+    public async Task<User> GetByEmail(string? email, bool include = false, bool tracking = false)
     {
         var user = await BaseQuery(tracking)
             .FirstOrDefaultAsync(x => x.Email == email);
 
-        return user;
+        return user ?? throw new InvalidOperationException($"User with email {email} not found");
     }
 }

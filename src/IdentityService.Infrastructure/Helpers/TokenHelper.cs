@@ -59,11 +59,18 @@ public class TokenHelper
 
             if (validatedToken is JwtSecurityToken jwtToken)
             {
+                var nameIdentifierClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var nameClaim = principal.FindFirst(ClaimTypes.Name)?.Value;
+                var emailClaim = principal.FindFirst(ClaimTypes.Email)?.Value;
+
+                if (string.IsNullOrEmpty(nameIdentifierClaim) || string.IsNullOrEmpty(nameClaim) || string.IsNullOrEmpty(emailClaim))
+                    return null;
+
                 var userData = new UserData
                 {
-                    Id = Guid.Parse(principal.FindFirst(ClaimTypes.NameIdentifier).Value),
-                    Name = principal.FindFirst(ClaimTypes.Name).Value,
-                    Email = principal.FindFirst(ClaimTypes.Email).Value,
+                    Id = Guid.Parse(nameIdentifierClaim),
+                    Name = nameClaim,
+                    Email = emailClaim,
                 };
                 return userData;
             }

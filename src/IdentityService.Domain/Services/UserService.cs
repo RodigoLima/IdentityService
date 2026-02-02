@@ -61,8 +61,13 @@ public class UserService(IUserRepository userRepository, UserData userData, IPas
 
     private async Task ValidateUserDoesNotExist(string? email)
     {
-        var existingUser = await _userRepository.GetByEmail(email);
-        if (existingUser != null)
+        try
+        {
+            await _userRepository.GetByEmail(email);
             throw new ArgumentException("O usuário já existe.");
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 }
