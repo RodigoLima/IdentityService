@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identityservice-api
+  namespace: identityservice
+  labels:
+    app: identityservice-api
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identityservice-api
+  template:
+    metadata:
+      labels:
+        app: identityservice-api
+        version: v1
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432; do
+                echo "Aguardando Postgres..."
+                sleep 2
+              done
+      containers:
+        - name: identityservice-api
+          image: identityservice-api:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: identityservice-config
+                  key: ASPNETCORE_ENVIRONMENT
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: identityservice-config
+                  key: ASPNETCORE_URLS
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: ConnectionStrings__DefaultConnection
+            - name: ConnectionStrings__PostgreSql
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: ConnectionStrings__PostgreSql
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: Jwt__Key
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5

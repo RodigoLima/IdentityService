@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: identityservice-service
+  namespace: identityservice
+  labels:
+    app: identityservice-api
+spec:
+  selector:
+    app: identityservice-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080
+      nodePort: 30080
+  type: NodePort
