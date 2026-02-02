@@ -32,7 +32,11 @@ public class UserFilter(UserData userData, ITokenApplicationService tokenApplica
         var token = context.HttpContext.Request.Headers.Authorization.FirstOrDefault();
         if (token != null)
         {
-            _userData.Set(TokenHelper.GetUserData(token, _configuration.Key));
+            var userData = TokenHelper.GetUserData(token, _configuration.Key);
+            if (userData != null)
+            {
+                _userData.Set(userData);
+            }
             var timeUntilExpiration = TokenHelper.GetTimeUntilExpiration(token, _configuration.Key);
 
             if (timeUntilExpiration.HasValue && timeUntilExpiration.Value.TotalMinutes <= 5)

@@ -39,7 +39,7 @@ public class TokenHelper
         return null;
     }
 
-    public static UserData GetUserData(string token, string jwtKey)
+    public static UserData? GetUserData(string token, string jwtKey)
     {
         token = GetToken(token);
         var key = new SymmetricSecurityKey(Convert.FromBase64String(jwtKey));
