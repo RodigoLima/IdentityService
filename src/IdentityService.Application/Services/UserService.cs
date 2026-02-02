@@ -1,6 +1,8 @@
+using AgroSolutions.Medicoes.Application.Contracts;
 using IdentityService.Application.Interfaces;
 using IdentityService.Domain.Entities;
 using IdentityService.Domain.Interfaces.Security;
+using MassTransit;
 
 namespace IdentityService.Application.Services;
 
@@ -8,11 +10,13 @@ public class UserService
 {
     private readonly IUserRepository _repository;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IPublishEndpoint _publishEndpoint;
 
-    public UserService(IUserRepository repository, IPasswordHasher passwordHasher)
+    public UserService(IUserRepository repository, IPasswordHasher passwordHasher, IPublishEndpoint publishEndpoint)
     {
         _repository = repository;
         _passwordHasher = passwordHasher;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task<User?> ObterPorIdAsync(Guid id)
@@ -38,7 +42,9 @@ public class UserService
             CreatedAt = DateTime.UtcNow
         };
 
-        return await _repository.CriarAsync(user);
+        var created = await _repository.CriarAsync(user);
+        await _publishEndpoint.Publish(new ProdutorDataMessage(created.Id, created.Email ?? string.Empty));
+        return created;
     }
 
     public async Task<bool> VerificarSenhaAsync(string email, string senha)

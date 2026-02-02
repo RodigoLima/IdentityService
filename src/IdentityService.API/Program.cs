@@ -7,6 +7,7 @@ using IdentityService.Domain.Interfaces.Security;
 using IdentityService.Domain.Services.Security;
 using IdentityService.Infrastructure.Data;
 using IdentityService.Infrastructure.Repositories;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using Prometheus;
@@ -66,6 +67,22 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasherService>();
 // Application Services
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IdentityService.Application.Services.TokenService>();
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        var host = builder.Configuration["RabbitMq:Host"] ?? "localhost";
+        var vhost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";
+        var username = builder.Configuration["RabbitMq:Username"] ?? "admin";
+        var password = builder.Configuration["RabbitMq:Password"] ?? "admin123";
+        cfg.Host(host, vhost, h =>
+        {
+            h.Username(username);
+            h.Password(password);
+        });
+    });
+});
 
 var app = builder.Build();
 
