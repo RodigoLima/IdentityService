@@ -7,10 +7,9 @@ on:
     branches: ["main"]
 
 jobs:
-  build:
-    name: build
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,17 +17,14 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: "8.0.x"
           cache: true
 
-      - name: Restore dependencies
-        run: dotnet restore
+      - name: Restore
+        run: dotnet restore IdentityService.sln
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build IdentityService.sln --no-restore --configuration Release
 
-  tests:
-    needs: build
-    uses: ./.github/workflows/run-tests.yml
-    with:
-      dotnet-env: '8.0.x'
+      - name: Run Tests
+        run: dotnet test tests/IdentityService.Tests.csproj --configuration Release --no-build --verbosity minimal

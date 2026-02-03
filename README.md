@@ -188,6 +188,17 @@ aws ecr create-repository \
   --region us-east-1
 ```
 
+### 3.1 Secrets do GitHub Actions (Docker Hub)
+
+No repositório GitHub: **Settings → Secrets and variables → Actions**. Crie:
+
+| Nome | Valor |
+|------|--------|
+| `DOCKERHUB_USERNAME` | seu usuário Docker Hub |
+| `DOCKERHUB_TOKEN` | token de acesso (Personal Access Token) |
+
+As imagens são publicadas em Docker Hub (`ferreirarodrigo230392/identityservice-api`).
+
 ### 4. Configurar Secrets no Kubernetes
 
 ```bash
