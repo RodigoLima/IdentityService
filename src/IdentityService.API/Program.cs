@@ -124,6 +124,8 @@ var app = builder.Build();
     app.MapControllers();
 
     Log.Information("IdentityService iniciado com sucesso");
+    var urls = app.Configuration["ASPNETCORE_URLS"] ?? app.Configuration["urls"] ?? "http://localhost:5093";
+    Log.Information("Escutando em: {Urls}", urls);
     app.Run();
 }
 catch (Exception ex)
