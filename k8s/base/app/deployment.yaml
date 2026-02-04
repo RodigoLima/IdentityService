@@ -62,6 +62,31 @@ spec:
                 secretKeyRef:
                   name: identityservice-secret
                   key: Jwt__Key
+            - name: RabbitMq__Host
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: RabbitMq__Host
+            - name: RabbitMq__Port
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: RabbitMq__Port
+            - name: RabbitMq__Username
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: RabbitMq__Username
+            - name: RabbitMq__Password
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: RabbitMq__Password
+            - name: RabbitMq__VirtualHost
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: RabbitMq__VirtualHost
           resources:
             requests:
               memory: "256Mi"

@@ -68,6 +68,8 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasherService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IdentityService.Application.Services.TokenService>();
 
+builder.Services.AddHealthChecks();
+
 builder.Services.AddMassTransit(x =>
 {
     x.UsingRabbitMq((context, cfg) =>
@@ -121,6 +123,7 @@ var app = builder.Build();
     app.UseHttpsRedirection();
     app.UseAuthentication();
     app.UseAuthorization();
+    app.MapHealthChecks("/health");
     app.MapControllers();
 
     Log.Information("IdentityService iniciado com sucesso");

@@ -14,3 +14,5 @@ data:
   Jwt__ExpirationTimeHour: "5"
   Jwt__IncreaseExpirationTimeMinutes: "20"
   PATH_BASE: "/api/identity"
+  RabbitMq__Host: "${RABBITMQ_HOST}"
+  RabbitMq__Port: "${RABBITMQ_PORT}"
