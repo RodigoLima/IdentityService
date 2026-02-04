@@ -53,6 +53,19 @@ public static class JwtConfiguration
                 ValidIssuer = jwtSettings.Issuer,
                 IssuerSigningKey = new SymmetricSecurityKey(signingKey)
             };
+            options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnMessageReceived = ctx =>
+                {
+                    if (string.IsNullOrEmpty(ctx.Token))
+                    {
+                        var auth = ctx.Request.Headers.Authorization.ToString();
+                        if (!string.IsNullOrEmpty(auth) && !auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                            ctx.Token = auth;
+                    }
+                    return Task.CompletedTask;
+                }
+            };
         });
 
         services.AddAuthorization();
