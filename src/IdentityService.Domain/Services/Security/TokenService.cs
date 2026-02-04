@@ -44,9 +44,7 @@ public class TokenService(IOptions<TokenConfiguration> options, IMemoryCache cac
         var tokenHandler = new JwtSecurityTokenHandler();
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new("sub", user.Id.ToString()),
-            new("userId", user.Id.ToString()),
             new(ClaimTypes.Name, user.Name ?? string.Empty),
             new(ClaimTypes.Email, user.Email ?? string.Empty)
         };
