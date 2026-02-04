@@ -3,6 +3,7 @@ using IdentityService.Application.Interfaces;
 using IdentityService.Domain.Entities;
 using IdentityService.Domain.Interfaces.Security;
 using MassTransit;
+using Microsoft.Extensions.Logging;
 
 namespace IdentityService.Application.Services;
 
@@ -11,12 +12,14 @@ public class UserService
     private readonly IUserRepository _repository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPublishEndpoint _publishEndpoint;
+    private readonly ILogger<UserService> _logger;
 
-    public UserService(IUserRepository repository, IPasswordHasher passwordHasher, IPublishEndpoint publishEndpoint)
+    public UserService(IUserRepository repository, IPasswordHasher passwordHasher, IPublishEndpoint publishEndpoint, ILogger<UserService> logger)
     {
         _repository = repository;
         _passwordHasher = passwordHasher;
         _publishEndpoint = publishEndpoint;
+        _logger = logger;
     }
 
     public async Task<User?> ObterPorIdAsync(Guid id)
@@ -43,7 +46,14 @@ public class UserService
         };
 
         var created = await _repository.CriarAsync(user);
-        await _publishEndpoint.Publish(new ProdutorDataMessage(created.Id, created.Email ?? string.Empty));
+        try
+        {
+            await _publishEndpoint.Publish(new ProdutorDataMessage(created.Id, created.Email ?? string.Empty));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falha ao publicar ProdutorDataMessage para produtor {ProdutorId}", created.Id);
+        }
         return created;
     }
 
