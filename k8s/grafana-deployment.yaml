@@ -306,7 +306,7 @@ metadata:
   labels:
     app: grafana
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: grafana
   ports:
@@ -314,3 +314,4 @@ spec:
     protocol: TCP
     port: 3000
     targetPort: 3000
+    nodePort: 30381

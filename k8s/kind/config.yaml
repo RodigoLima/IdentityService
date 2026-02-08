@@ -15,10 +15,22 @@ nodes:
         hostPort: 30033
       - containerPort: 5000
         hostPort: 5000
-      - containerPort: 3000
-        hostPort: 3000
-      - containerPort: 9090
-        hostPort: 9090
+      - containerPort: 30380
+        hostPort: 30380
+      - containerPort: 30980
+        hostPort: 30980
+      - containerPort: 30381
+        hostPort: 30381
+      - containerPort: 30981
+        hostPort: 30981
+      - containerPort: 30300
+        hostPort: 30300
+      - containerPort: 30900
+        hostPort: 30900
+      - containerPort: 30000
+        hostPort: 30000
+      - containerPort: 30902
+        hostPort: 30902
       - containerPort: 5672
         hostPort: 5672
       - containerPort: 15672
