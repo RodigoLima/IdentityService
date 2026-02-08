@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-KIND_NAME="dev-identityservice"
+KIND_NAME="agro-dev"
 NAMESPACE="identityservice"
 ENV_FILE="$ROOT_DIR/.env"
 
@@ -99,4 +99,4 @@ echo ""
 echo "Deploy concluído. Pods:"
 kubectl get pods -n "$NAMESPACE"
 echo ""
-echo "API (NodePort 30080): http://localhost:30080"
+echo "API (NodePort 30081): http://localhost:30081"
