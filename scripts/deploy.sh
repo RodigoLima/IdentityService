@@ -35,9 +35,11 @@ if ! kind get clusters 2>/dev/null | grep -q "^${KIND_NAME}$"; then
   kind create cluster --config "$ROOT_DIR/k8s/kind/config.yaml"
 fi
 
-echo "Build e carregamento da imagem..."
-docker build -t identityservice-api:dev "$ROOT_DIR"
-kind load docker-image identityservice-api:dev --name "$KIND_NAME"
+if [ -z "${SKIP_BUILD:-}" ]; then
+  echo "Build e carregamento da imagem..."
+  docker build -t identityservice-api:dev "$ROOT_DIR"
+  kind load docker-image identityservice-api:dev --name "$KIND_NAME"
+fi
 
 ctx=$(kubectl config current-context 2>/dev/null)
 [[ "$ctx" != *"$KIND_NAME"* ]] && { echo "Contexto Kind não está ativo."; exit 1; }
@@ -60,8 +62,8 @@ kubectl apply -f "$ROOT_DIR/k8s/base/postgresql/pvc.yaml"
 kubectl apply -f "$ROOT_DIR/k8s/base/postgresql/deployment.yaml"
 kubectl apply -f "$ROOT_DIR/k8s/base/postgresql/service.yaml"
 
-echo "Aguardando Postgres ficar pronto..."
-kubectl wait --for=condition=ready pod -l app=postgres -n "$NAMESPACE" --timeout=120s 2>/dev/null || sleep 15
+WAIT_TO="${WAIT_TIMEOUT:-45}"
+if kubectl wait --for=condition=ready pod -l app=postgres -n "$NAMESPACE" --timeout=0s 2>/dev/null; then echo "Postgres já pronto."; else echo "Aguardando Postgres..."; kubectl wait --for=condition=ready pod -l app=postgres -n "$NAMESPACE" --timeout="${WAIT_TO}s" 2>/dev/null || sleep 5; fi
 
 CONN="Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
 echo "Criando secret identityservice-secret..."
@@ -97,8 +99,7 @@ kubectl apply -f "$ROOT_DIR/k8s/prometheus-config.yaml"
 kubectl apply -f "$ROOT_DIR/k8s/prometheus-deployment.yaml"
 kubectl apply -f "$ROOT_DIR/k8s/grafana-deployment.yaml"
 
-echo "Aguardando API..."
-kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout=120s 2>/dev/null || true
+if kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout=0s 2>/dev/null; then echo "API já pronta."; else echo "Aguardando API..."; kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout="${WAIT_TO}s" 2>/dev/null || true; fi
 
 echo ""
 echo "Deploy concluído. Pods:"
