@@ -42,8 +42,8 @@ metadata:
 data:
   identityservice-api.json: |
     {
-      "title": "Identity Service API - AWS EKS",
-      "tags": ["identityservice", "dotnet", "api", "aws", "eks"],
+      "title": "Identity Service API",
+      "tags": ["identityservice", "dotnet", "api"],
       "timezone": "browser",
       "editable": true,
       "refresh": "10s",

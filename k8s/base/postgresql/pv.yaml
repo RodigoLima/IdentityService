@@ -11,3 +11,9 @@ spec:
   hostPath:
     path: "/data/postgres"
     type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists

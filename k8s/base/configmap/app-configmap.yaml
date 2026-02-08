@@ -8,8 +8,6 @@ metadata:
 data:
   ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
   ASPNETCORE_URLS: "http://+:8080"
-  AWS__Region: "${AWS__Region}"
-  AWS__AccountId: "${AWS__AccountId}"
   DatabaseProvider: "PostgreSql"
   Jwt__ExpirationTimeHour: "5"
   Jwt__IncreaseExpirationTimeMinutes: "20"

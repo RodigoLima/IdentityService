@@ -45,18 +45,6 @@ spec:
               name: identityservice-config
               key: ASPNETCORE_URLS
         
-        - name: AWS__Region
-          valueFrom:
-            configMapKeyRef:
-              name: identityservice-config
-              key: AWS__Region
-        
-        - name: AWS__AccountId
-          valueFrom:
-            configMapKeyRef:
-              name: identityservice-config
-              key: AWS__AccountId
-        
         - name: DatabaseProvider
           valueFrom:
             configMapKeyRef:

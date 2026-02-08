@@ -5,11 +5,10 @@ Microserviço de autenticação e gerenciamento de identidade desenvolvido com .
 ## 🚀 Tecnologias
 
 - **.NET 8** com C# 12
-- **PostgreSQL** (AWS RDS)
-- **Docker** & **Kubernetes** (Amazon EKS)
+- **PostgreSQL**
+- **Docker** & **Kubernetes** (Kind)
 - **JWT** para autenticação
 - **Prometheus** & **Grafana** para monitoramento
-- **AWS Cloud** (EKS, RDS, ECR, VPC, LoadBalancer)
 
 ## 📁 Estrutura do Projeto
 
@@ -144,82 +143,6 @@ O serviço utiliza JWT (JSON Web Tokens) para autenticação. Para usar os endpo
 - **User**: Acesso limitado
 - **Guest**: Acesso básico
 
-## 🚢 Deploy na AWS
-
-### Pré-requisitos
-
-- [AWS CLI](https://aws.amazon.com/cli/)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- Conta AWS configurada
-
-### 1. Criar EKS Cluster
-
-```bash
-aws eks create-cluster \
-  --name identityservice-cluster \
-  --role-arn arn:aws:iam::ACCOUNT_ID:role/LabRole \
-  --resources-vpc-config subnetIds=subnet-xxx,subnet-yyy,securityGroupIds=sg-xxx \
-  --region us-east-1
-
-aws eks wait cluster-active --name identityservice-cluster --region us-east-1
-aws eks update-kubeconfig --region us-east-1 --name identityservice-cluster
-```
-
-### 2. Criar RDS PostgreSQL
-
-```bash
-aws rds create-db-instance \
-  --db-instance-identifier identityservice-db \
-  --db-instance-class db.t3.micro \
-  --engine postgres \
-  --engine-version 15.8 \
-  --master-username postgres \
-  --master-user-password YOUR_PASSWORD \
-  --allocated-storage 20 \
-  --vpc-security-group-ids sg-xxx \
-  --region us-east-1
-```
-
-### 3. Criar ECR Repository
-
-```bash
-aws ecr create-repository \
-  --repository-name identityservice-api \
-  --region us-east-1
-```
-
-### 3.1 Secrets do GitHub Actions (Docker Hub)
-
-No repositório GitHub: **Settings → Secrets and variables → Actions**. Crie:
-
-| Nome | Valor |
-|------|--------|
-| `DOCKERHUB_USERNAME` | seu usuário Docker Hub |
-| `DOCKERHUB_TOKEN` | token de acesso (Personal Access Token) |
-
-As imagens são publicadas em Docker Hub (`ferreirarodrigo230392/identityservice-api`).
-
-### 4. Configurar Secrets no Kubernetes
-
-```bash
-kubectl create namespace identityservice
-
-kubectl create secret generic identityservice-secret \
-  --from-literal=ConnectionStrings__PostgreSql="Host=YOUR_RDS_ENDPOINT;Database=identity_db;Username=postgres;Password=YOUR_PASSWORD" \
-  --from-literal=Jwt__Key="YOUR_JWT_KEY_MIN_32_CHARS_BASE64" \
-  --namespace=identityservice
-```
-
-### 5. Deploy
-
-```bash
-# Aplicar manifests
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
-```
-
 ## 📊 Monitoramento
 
 ### Prometheus
@@ -232,7 +155,7 @@ Acesse: `http://<GRAFANA_URL>:3000`
 - Usuário: `admin`
 - Senha: `admin`
 
-Dashboard pré-configurado: "Identity Service API - AWS EKS"
+Dashboard pré-configurado: "Identity Service API"
 
 ## 🧪 Testes
 
@@ -246,8 +169,6 @@ dotnet test --collect:"XPlat Code Coverage"
 
 ## 📚 Documentação Adicional
 
-- [Arquitetura AWS](./docs/architecture.md)
-- [Guia de Deploy](./docs/deployment.md)
 - [Monitoramento](./k8s/MONITORING.md)
 
 ## 🤝 Contribuindo
