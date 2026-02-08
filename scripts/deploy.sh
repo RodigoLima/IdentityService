@@ -18,6 +18,8 @@ RABBITMQ_USER="${RABBITMQ_USER:-admin}"
 RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-admin123}"
 RABBITMQ_VHOST="${RABBITMQ_VHOST:-/}"
 JWT_KEY="${JWT_KEY:-7G+H65bLToXxqzPvj7+q0oQUlxJp1WvdOU3nv3ArA1s=}"
+DEFAULT_ADMIN_EMAIL="${DEFAULT_ADMIN_EMAIL:-admin@localhost}"
+DEFAULT_ADMIN_PASSWORD="${DEFAULT_ADMIN_PASSWORD:-Admin@123}"
 ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}"
 
 [ -f "$ENV_FILE" ] && set -a && source "$ENV_FILE" && set +a
@@ -69,6 +71,8 @@ if kubectl wait --for=condition=ready pod -l app=postgres -n "$NAMESPACE" --time
 CONN="Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}"
 echo "Criando secret identityservice-secret..."
 kubectl create secret generic identityservice-secret -n "$NAMESPACE" \
+  --from-literal=DefaultAdmin__Email="$DEFAULT_ADMIN_EMAIL" \
+  --from-literal=DefaultAdmin__Password="$DEFAULT_ADMIN_PASSWORD" \
   --from-literal=ConnectionStrings__DefaultConnection="$CONN" \
   --from-literal=ConnectionStrings__PostgreSql="Host=${DB_HOST};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};Port=${DB_PORT}" \
   --from-literal=Jwt__Key="$JWT_KEY" \

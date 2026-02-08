@@ -69,6 +69,16 @@ spec:
                 secretKeyRef:
                   name: identityservice-secret
                   key: Jwt__Key
+            - name: DefaultAdmin__Email
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: DefaultAdmin__Email
+            - name: DefaultAdmin__Password
+              valueFrom:
+                secretKeyRef:
+                  name: identityservice-secret
+                  key: DefaultAdmin__Password
             - name: RabbitMq__Host
               valueFrom:
                 secretKeyRef:

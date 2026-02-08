@@ -3,6 +3,8 @@ using IdentityService.Api.Middlewares;
 using IdentityService.Application.Interfaces;
 using IdentityService.Application.Services;
 using IdentityService.Domain.Configuration;
+using IdentityService.Domain.Entities;
+using IdentityService.Domain.Enums;
 using IdentityService.Domain.Interfaces.Security;
 using IdentityService.Domain.Services.Security;
 using IdentityService.Infrastructure.Data;
@@ -89,12 +91,37 @@ builder.Services.AddMassTransit(x =>
 
 var app = builder.Build();
 
-    // Aplicar migrations automaticamente
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         dbContext.Database.Migrate();
         Log.Information("Migrations aplicadas com sucesso");
+
+        var adminEmail = app.Configuration["DefaultAdmin:Email"];
+        if (!string.IsNullOrWhiteSpace(adminEmail))
+        {
+            var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            var existing = await userRepo.ObterPorEmailAsync(adminEmail);
+            if (existing == null)
+            {
+                var adminPassword = app.Configuration["DefaultAdmin:Password"] ?? "Admin@123";
+                var adminId = Guid.NewGuid();
+                var admin = new User
+                {
+                    Id = adminId,
+                    Name = "Administrador",
+                    Email = adminEmail,
+                    Password = passwordHasher.HashPassword(adminPassword),
+                    AccessLevel = AccessLevel.Admin,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = adminId,
+                    Removed = false
+                };
+                await userRepo.CriarAsync(admin);
+                Log.Information("Usuario administrador padrao criado: {Email}", adminEmail);
+            }
+        }
     }
 
     // Middlewares
