@@ -92,6 +92,11 @@ echo "Aplicando API..."
 kubectl apply -f "$ROOT_DIR/k8s/base/app/deployment.yaml"
 kubectl apply -f "$ROOT_DIR/k8s/base/app/service.yaml"
 
+echo "Aplicando observabilidade (Prometheus + Grafana)..."
+kubectl apply -f "$ROOT_DIR/k8s/prometheus-config.yaml"
+kubectl apply -f "$ROOT_DIR/k8s/prometheus-deployment.yaml"
+kubectl apply -f "$ROOT_DIR/k8s/grafana-deployment.yaml"
+
 echo "Aguardando API..."
 kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout=120s 2>/dev/null || true
 
@@ -100,3 +105,5 @@ echo "Deploy concluído. Pods:"
 kubectl get pods -n "$NAMESPACE"
 echo ""
 echo "API (NodePort 30081): http://localhost:30081"
+echo "Grafana: kubectl port-forward -n identityservice svc/grafana 3000:3000 -> http://localhost:3000 (admin/admin)"
+echo "Prometheus: kubectl port-forward -n identityservice svc/prometheus 9090:9090 -> http://localhost:9090"
