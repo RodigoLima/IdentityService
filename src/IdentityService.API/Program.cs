@@ -76,6 +76,7 @@ builder.Services.AddMassTransit(x =>
     {
         var host = builder.Configuration["RabbitMq:Host"] ?? "localhost";
         var vhost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";
+        if (string.IsNullOrEmpty(vhost) || vhost.Contains(':') || vhost.Contains("Program")) vhost = "/";
         var username = builder.Configuration["RabbitMq:Username"] ?? "admin";
         var password = builder.Configuration["RabbitMq:Password"] ?? "admin123";
         cfg.Host(host, vhost, h =>

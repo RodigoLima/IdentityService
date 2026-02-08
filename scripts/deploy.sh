@@ -17,11 +17,11 @@ RABBITMQ_PORT="${RABBITMQ_PORT:-5672}"
 RABBITMQ_USER="${RABBITMQ_USER:-admin}"
 RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-admin123}"
 RABBITMQ_VHOST="${RABBITMQ_VHOST:-/}"
-[[ -z "$RABBITMQ_VHOST" || "$RABBITMQ_VHOST" == *":"* || "$RABBITMQ_VHOST" == *"Program"* ]] && RABBITMQ_VHOST="/"
 JWT_KEY="${JWT_KEY:-7G+H65bLToXxqzPvj7+q0oQUlxJp1WvdOU3nv3ArA1s=}"
 ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}"
 
 [ -f "$ENV_FILE" ] && set -a && source "$ENV_FILE" && set +a
+[[ -z "$RABBITMQ_VHOST" || "$RABBITMQ_VHOST" == *":"* || "$RABBITMQ_VHOST" == *"Program"* ]] && RABBITMQ_VHOST="/"
 
 echo "================================================"
 echo "  IdentityService - Build & Deploy (Kind)"
