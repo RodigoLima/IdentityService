@@ -111,7 +111,11 @@ var app = builder.Build();
 
     // Pipeline
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Service API v1");
+        c.RoutePrefix = "swagger";
+    });
 
     // Observabilidade - Métricas Prometheus
     app.UseMetricServer();
