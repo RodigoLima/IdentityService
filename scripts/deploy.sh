@@ -36,6 +36,8 @@ command -v docker >/dev/null 2>&1 || { echo "Docker não instalado."; exit 1; }
 if ! kind get clusters 2>/dev/null | grep -q "^${KIND_NAME}$"; then
   echo "Criando cluster Kind ${KIND_NAME}..."
   kind create cluster --config "$ROOT_DIR/k8s/kind/config.yaml"
+else
+  [ "$(kubectl config current-context 2>/dev/null)" != "kind-${KIND_NAME}" ] && kubectl config use-context kind-${KIND_NAME} 2>/dev/null || true
 fi
 
 if [ -z "${SKIP_BUILD:-}" ]; then
@@ -46,6 +48,16 @@ fi
 
 ctx=$(kubectl config current-context 2>/dev/null)
 [[ "$ctx" != *"$KIND_NAME"* ]] && { echo "Contexto Kind não está ativo."; exit 1; }
+
+PROJECTS_ROOT="${PROJECTS_ROOT:-$(cd "$ROOT_DIR/.." && pwd)}"
+DATA_INGESTION_ROOT="${DATA_INGESTION_ROOT:-$PROJECTS_ROOT/AgroSolutions.DataIngestion}"
+if ! kubectl get ns sensor-ingestion &>/dev/null && [ -d "$DATA_INGESTION_ROOT/k8s" ]; then
+  echo "Aplicando RabbitMQ (dependência)..."
+  kubectl apply -f "$DATA_INGESTION_ROOT/k8s/namespaces.yaml"
+  kubectl apply -f "$DATA_INGESTION_ROOT/k8s/infra/rabbitmq"
+  WAIT_TO="${WAIT_TIMEOUT:-45}"
+  kubectl wait --for=condition=ready pod -l app=rabbitmq -n sensor-ingestion --timeout="${WAIT_TO}s" 2>/dev/null || sleep 10
+fi
 
 echo "Aplicando namespace..."
 kubectl apply -f "$ROOT_DIR/k8s/base/namespaces/identityservice.yaml"
@@ -104,7 +116,8 @@ kubectl apply -f "$ROOT_DIR/k8s/prometheus-config.yaml"
 kubectl apply -f "$ROOT_DIR/k8s/prometheus-deployment.yaml"
 kubectl apply -f "$ROOT_DIR/k8s/grafana-deployment.yaml"
 
-if kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout=0s 2>/dev/null; then echo "API já pronta."; else echo "Aguardando API..."; kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout="${WAIT_TO}s" 2>/dev/null || true; fi
+WAIT_TO="${WAIT_TIMEOUT:-45}"
+if kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout=0s 2>/dev/null; then echo "API já pronta."; else echo "Aguardando API..."; kubectl wait --for=condition=ready pod -l app=identityservice-api -n "$NAMESPACE" --timeout="${WAIT_TO}s" || { echo "API não ficou pronta. Verifique: kubectl get pods -n $NAMESPACE"; exit 1; }; fi
 
 echo ""
 echo "Deploy concluído. Pods:"
