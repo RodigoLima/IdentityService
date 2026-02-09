@@ -51,12 +51,19 @@ ctx=$(kubectl config current-context 2>/dev/null)
 
 PROJECTS_ROOT="${PROJECTS_ROOT:-$(cd "$ROOT_DIR/.." && pwd)}"
 DATA_INGESTION_ROOT="${DATA_INGESTION_ROOT:-$PROJECTS_ROOT/AgroSolutions.DataIngestion}"
-if ! kubectl get ns sensor-ingestion &>/dev/null && [ -d "$DATA_INGESTION_ROOT/k8s" ]; then
-  echo "Aplicando RabbitMQ (dependência)..."
-  kubectl apply -f "$DATA_INGESTION_ROOT/k8s/namespaces.yaml"
-  kubectl apply -f "$DATA_INGESTION_ROOT/k8s/infra/rabbitmq"
-  WAIT_TO="${WAIT_TIMEOUT:-45}"
-  kubectl wait --for=condition=ready pod -l app=rabbitmq -n sensor-ingestion --timeout="${WAIT_TO}s" 2>/dev/null || sleep 10
+WAIT_TO="${WAIT_TIMEOUT:-45}"
+if [ -d "$DATA_INGESTION_ROOT/k8s" ]; then
+  if ! kubectl get ns sensor-ingestion &>/dev/null; then
+    echo "Aplicando RabbitMQ (dependência)..."
+    kubectl apply -f "$DATA_INGESTION_ROOT/k8s/namespaces.yaml"
+    kubectl apply -f "$DATA_INGESTION_ROOT/k8s/secrets.yaml"
+    kubectl apply -f "$DATA_INGESTION_ROOT/k8s/infra/rabbitmq"
+    kubectl wait --for=condition=ready pod -l app=rabbitmq -n sensor-ingestion --timeout="${WAIT_TO}s" 2>/dev/null || sleep 10
+  else
+    kubectl apply -f "$DATA_INGESTION_ROOT/k8s/secrets.yaml" 2>/dev/null || true
+    echo "Aguardando RabbitMQ..."
+    kubectl wait --for=condition=ready pod -l app=rabbitmq -n sensor-ingestion --timeout="${WAIT_TO}s" 2>/dev/null || sleep 5
+  fi
 fi
 
 echo "Aplicando namespace..."
