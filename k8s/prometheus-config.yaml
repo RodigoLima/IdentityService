@@ -38,7 +38,7 @@ data:
             action: replace
             target_label: pod
           
-          - source_labels: [__meta_kubernetes_namespace]
+          - source_labels: [__meta_kubernetes_pod_namespace]
             action: replace
             target_label: namespace
           
