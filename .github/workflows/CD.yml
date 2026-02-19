@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKERHUB_REPOSITORY: ferreirarodrigo230392/identityservice-api
+  DOCKERHUB_REPOSITORY: rm364831/identityservice-api
 
 jobs:
   deploy:
